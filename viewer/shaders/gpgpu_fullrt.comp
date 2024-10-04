@@ -369,6 +369,15 @@ vec4 directIllumination(vec4 color, vec4 p, vec4 n, vec4 v) {
     vec3 H_vec = normalize(v_vec + L_vec);
 
     vec4 C_a = Ka * color * lightIntensity;
+
+
+    bool isNotVisible = isIntersected(p.xyzw, vec4(L_vec.x,L_vec.y,L_vec.z,0.0));
+
+
+    if (isNotVisible) {
+        
+        return C_a;
+    }
     vec4 C_d = Kd * color.rgba * max(dot(n_vec, L_vec), 0.0) * lightIntensity;
 
     float cos_theta_i = dot(n_vec, L_vec);
@@ -422,6 +431,20 @@ struct trace_state_t
     vec4 N;       // normal at destination
 };
 
+vec4 reflectVector(vec4 i, vec4 n) {
+    // Normalize the incident vector and the normal vector
+    vec3 i_vec = normalize(i.xyz);
+    vec3 n_vec = normalize(n.xyz);
+
+    // Calculate the dot product of the incident vector and the normal vector
+    float dot_product = dot(i_vec, n_vec);
+
+    // Calculate the reflection vector
+    vec3 r_vec = i_vec - 2.0 * dot_product * n_vec;
+
+    // Return the reflection vector as a vec4
+    return vec4(r_vec, 0.0);
+}
 vec4 trace(vec4 origin, vec4 dir)
 {
     // These variables are for TP2
@@ -434,12 +457,63 @@ vec4 trace(vec4 origin, vec4 dir)
     vec4 hit;
     vec4 localColor;
     vec4 N;
+    float ratio= 0.2;
 
     float specular_factor, LdN;
 
 	if (firstIntersection(origin, dir, hl)) {
 		getLocal(origin, dir, hl, localColor, hit, N);
-		return directIllumination(localColor, hit, N, -dir);
+        trace_state_t curr;
+        curr.origin=origin;
+        curr.dir=dir;
+        curr.localColor=localColor;
+        curr.color=localColor;
+        curr.h=hl;
+        curr.hit=hit;
+        curr.Ld=vec4(normalize(lightPosition - hit.xyz),0.0);
+        curr.N=N;
+        stack[0]=curr;
+        fallback[0]=true;
+        for(int i=0;i<MAX_TRACE;i++){
+            vec4 hit_r;
+            vec4 localColor_r;
+            vec4 N_r;
+            vec4 ref= reflectVector(stack[i].origin,stack[i].dir);
+            hitinfo_t hr;
+            if(firstIntersection(stack[i].origin,stack[i].dir,hr)){
+                getLocal(stack[i].origin, stack[i].dir, hr,localColor_r, hit_r, N_r);
+                trace_state_t new;
+                new.origin=stack[0].hit;
+                new.dir=ref;
+                new.localColor=localColor_r;
+                new.color=localColor_r;
+                new.h=hr;
+                new.hit=hit_r;
+                new.Ld=vec4(normalize(lightPosition - hit_r.xyz),0.0);
+                new.N=N_r;
+                stack[i+1]=new;
+                fallback[i+1]=true;
+
+            }else{
+                break;
+            }
+        }
+        
+        for(int j =1 ;j<MAX_TRACE;j++){
+            if(fallback[MAX_TRACE-j-1] == true){
+                
+                trace_state_t prev=stack[MAX_TRACE-j-1];
+                trace_state_t current =stack[MAX_TRACE-j];
+                current.color= directIllumination(current.localColor, current.hit, current.N, -current.dir)+ ratio*prev.color;
+
+            }
+        }
+
+        if(fallback[1]==false){
+		    return directIllumination(localColor, hit, N, -dir);
+        }else{
+            return stack[0].color;
+        }
 	}
 
     return vec4(0, 0, 0, 1);
