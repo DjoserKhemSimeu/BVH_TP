@@ -398,20 +398,23 @@ vec4 directIllumination(vec4 color, vec4 p, vec4 n, vec4 v) {
 
     vec4 C_a = Ka * color * lightIntensity;
 
+    float cos_theta_i = dot(n_vec, L_vec);
+    float cos_theta_o = dot(n_vec, v_vec);
+    float cos_theta_h = dot(n_vec, H_vec);
+    float cos_theta_d = dot(v_vec, H_vec);
+    
+    bool isNotVisible1 = isIntersected(p.xyzw, vec4(L_vec.x,L_vec.y,L_vec.z,0.0));
+    bool isNotVisible2 = isIntersected(p.xyzw+0.5, vec4(L_vec.x,L_vec.y,L_vec.z,0.0));
+    bool isNotVisible= isNotVisible1 && isNotVisible2;
 
-    bool isNotVisible = isIntersected(p.xyzw, vec4(L_vec.x,L_vec.y,L_vec.z,0.0));
 
-
-    if (isNotVisible) {
+    if (isNotVisible || cos_theta_i<=0) {
         
         return C_a;
     }
     vec4 C_d = Kd * color.rgba * max(dot(n_vec, L_vec), 0.0) * lightIntensity;
 
-    float cos_theta_i = dot(n_vec, L_vec);
-    float cos_theta_o = dot(n_vec, v_vec);
-    float cos_theta_h = dot(n_vec, H_vec);
-    float cos_theta_d = dot(v_vec, H_vec);
+    
 
 
     float F = fresnelVal(cos_theta_d);
@@ -453,6 +456,7 @@ struct trace_state_t
     vec4 dir;     // direction
     vec4 color;   // color after multiple bounces
     vec4 localColor;   // color of the material (after interpolation)
+    vec4 brdf;
     hitinfo_t h;  // what the ray hits (triangle Id, u, v, lambda)
     vec4 hit;     // point the ray hits 
     vec4 Ld;      // direction to light at destination
@@ -464,18 +468,19 @@ vec4 reflectVector(vec4 i, vec4 n) {
     vec3 i_vec = normalize(i.xyz);
     vec3 n_vec = normalize(n.xyz);
 
-    // Calculate the dot product of the incident vector and the normal vector
+    
     float dot_product = dot(i_vec, n_vec);
 
-    // Calculate the reflection vector
+    
     vec3 r_vec = i_vec - 2.0 * dot_product * n_vec;
 
-    // Return the reflection vector as a vec4
+    
     return vec4(r_vec, 0.0);
 }
+
 vec4 trace(vec4 origin, vec4 dir)
 {
-    // Allocate an array of struct trace_state_t to contain the intersections encountered by the ray
+    // These are for TP2:
     trace_state_t stack[MAX_TRACE + 1];
     bool fallback[MAX_TRACE + 1];
     int sp = 0;
@@ -501,8 +506,8 @@ vec4 trace(vec4 origin, vec4 dir)
         stack[0] = curr;
         fallback[0] = true;
 
-        // Forward tracing: for each ray, compute the intersection, store the intersection, compute the bouncing ray, iterate until the ray does not intersect anything or until you have reached the maximum number of bounces.
-        for (int i = 0; i < MAX_TRACE; i++) {
+        // Forward tracing
+        for (int i = 0; i < MAX_TRACE && fallback[i]; i++) {
             vec4 hit_r;
             vec4 localColor_r;
             vec4 N_r;
@@ -520,27 +525,30 @@ vec4 trace(vec4 origin, vec4 dir)
                 newState.Ld = vec4(normalize(lightPosition - hit_r.xyz), 0.0);
                 newState.N = N_r;
                 stack[i + 1] = newState;
+                
                 fallback[i + 1] = true;
-            } else {
-                break;
+            } else{
+                fallback[i+1] =false;
             }
         }
 
-        // Backward color computing: you can now compute the ray color. Start by computing the color for the last point hit (the one further from the eye), using direct illumination and a shadow ray, then move down the stack. At each point, you have to compute the direct lighting using a shadow ray, and combine it with indirect lighting (what you have computed so far).
+        // Backward color computing
+        
         for (int j = MAX_TRACE; j >= 0; j--) {
             if (fallback[j]) {
                 trace_state_t current = stack[j];
-                current.localColor = directIllumination(current.color, current.hit, current.N, -current.dir);
+                current.color = directIllumination(current.localColor, current.hit, current.N, -current.dir);
+                current.brdf=computeSpecular(current.localColor, current.hit, current.N, -current.dir);
                 if (j < MAX_TRACE && fallback[j+1]) {
-                    current.color = current.localColor + ratio*stack[j + 1].color; 
-                } else {
-                    current.color = current.localColor; 
-                }
+                    current.color = current.color+ratio*(stack[j + 1].color); 
+                } 
                 stack[j] = current; 
             }
         }
         
         return stack[0].color;
+        
+           
        
     }
 
