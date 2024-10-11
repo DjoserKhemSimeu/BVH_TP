@@ -302,7 +302,17 @@ bool intersectBVH(vec4 origin, vec4 dir)
     return false;
 }
 // End BVH-related functions
+// Gold Noise ©2015 dcerisano@standard3d.com
+// - based on the Golden Ratio
+// - uniform normalized distribution
+// - fastest static noise generator function (also runs at low precision)
+// - use with indicated fractional seeding method. 
 
+float PHI = 1.61803398874989484820459;  // Φ = Golden Ratio   
+
+float gold_noise(in vec2 xy, in float seed){
+       return fract(tan(distance(xy*PHI, xy)*seed)*xy.x);
+}
 // Compute the first intersection along the ray (origin, dir). 
 // returns the nearest intersection in h
 bool firstIntersection(vec4 origin, vec4 dir, out hitinfo_t h)
@@ -563,11 +573,15 @@ layout (local_size_x = 8, local_size_y = 8) in;
 void main(void) {
 	// Convert local screen coordinates into world coordinates
     ivec2 pix = ivec2(gl_GlobalInvocationID.xy);
+    vec2 pix_2 = vec2(pix);
     ivec2 size = imageSize(framebuffer);
+    vec2 rand = vec2(1.0,1.0);
+    pix_2.x+=min(gold_noise(rand,0.25),0.5);
+    pix_2.y+=min(gold_noise(rand,0.5),0.5);
     if (pix.x >= size.x || pix.y >= size.y) {
         return;
     }
-    vec2 pos = pix / (size - vec2(0.5, 0.5));
+    vec2 pos = pix_2 / (size - vec2(0.5, 0.5));
     // pos in [0,1]^2 Need it in [-1,1]^2:
     pos = 2 * pos - vec2(1., 1.);
 
