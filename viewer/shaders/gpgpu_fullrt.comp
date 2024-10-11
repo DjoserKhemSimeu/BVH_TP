@@ -427,7 +427,7 @@ vec4 directIllumination(vec4 color, vec4 p, vec4 n, vec4 v) {
         C_s = F * color.rgba * pow(max(dot(n_vec, H_vec), 0.0), shininess) * lightIntensity;
     } else {
         float G = G1_i * G1_o;
-        float specular = (F * D * G) / (4.0 * cos_theta_i * cos_theta_o)*lightIntensity*shininess;
+        float specular = (F * D * G) / (4.0 * cos_theta_i * cos_theta_o)*lightIntensity;
         C_s = vec4(specular * color.rgba);
     }
 
@@ -540,7 +540,11 @@ vec4 trace(vec4 origin, vec4 dir)
                 current.color = directIllumination(current.localColor, current.hit, current.N, -current.dir);
                 current.brdf=computeSpecular(current.localColor, current.hit, current.N, -current.dir);
                 if (j < MAX_TRACE && fallback[j+1]) {
-                    current.color = current.color+ratio*(stack[j + 1].color); 
+                    vec3 n_vec=normalize(stack[j+1].N.xyz);
+                    vec3 v_vec=normalize(-stack[j+1].dir.xyz);
+                    float cos_theta= max(dot(v_vec,n_vec),0.25);
+                    float F = fresnelVal(cos_theta);
+                    current.color = current.color+F*(stack[j + 1].color); 
                 } 
                 stack[j] = current; 
             }
