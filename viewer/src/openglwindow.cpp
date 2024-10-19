@@ -121,7 +121,7 @@ void OpenGLWindow::exposeEvent(QExposeEvent *event)
 //! [3]
 
 //! [4]
-void OpenGLWindow::renderNow()
+ void OpenGLWindow::renderNow()
 {
     if (!isExposed())
         return;

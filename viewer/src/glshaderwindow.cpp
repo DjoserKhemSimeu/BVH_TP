@@ -3,6 +3,7 @@
 #include <QMessageBox>
 #include <QPixmap>
 #include <QScreen>
+#include <QTimer>
 #include <QQuaternion>
 #include <QOpenGLFramebufferObjectFormat>
 // Buttons/sliders for User interface:
@@ -29,7 +30,7 @@ glShaderWindow::glShaderWindow(QWindow *parent)
       g_vertices(0), g_normals(0), g_texcoords(0), g_colors(0), g_indices(0),
       gpgpu_vertices(0), gpgpu_normals(0), gpgpu_texcoords(0), gpgpu_colors(0), gpgpu_indices(0),
       environmentMap(0), texture(0), permTexture(0), pixels(0), mouseButton(Qt::NoButton), auxWidget(0),
-      isGPGPU(true), hasComputeShaders(true), blinnPhong(true), transparent(true),roughness(0.05), eta(1.5), lightIntensity(1.0f), shininess(50.0f), lightDistance(5.0f), groundDistance(0.78),
+      isGPGPU(true), hasComputeShaders(true), blinnPhong(true), transparent(true),roughness(0.05), eta(1.5), lightIntensity(1.0f), shininess(50.0f),time(0.0f), lightDistance(5.0f), groundDistance(0.78),
       shadowMap_fboId(0), shadowMap_rboId(0), shadowMap_textureId(0), fullScreenSnapshots(false), computeResult(0), 
       m_indexBuffer(QOpenGLBuffer::IndexBuffer), ground_indexBuffer(QOpenGLBuffer::IndexBuffer)
 {
@@ -111,6 +112,7 @@ void glShaderWindow::openSceneFromFile() {
     if (!modelName.isNull())
     {
         openScene();
+        time=0;
         renderNow();
     }
 }
@@ -139,6 +141,7 @@ void glShaderWindow::openNewTexture() {
 				texture->bind(0);
             }
         }
+        time=0;
         renderNow();
     }
 }
@@ -165,6 +168,7 @@ void glShaderWindow::openNewEnvMap() {
             environmentMap->setMagnificationFilter(QOpenGLTexture::Nearest);
             environmentMap->bind(1);
         }
+        time=0;
         renderNow();
     }
 }
@@ -172,47 +176,55 @@ void glShaderWindow::openNewEnvMap() {
 void glShaderWindow::cookTorranceClicked()
 {
     blinnPhong = false;
+    time=0;
     renderNow();
 }
 
 void glShaderWindow::blinnPhongClicked()
 {
     blinnPhong = true;
+    time=0;
     renderNow();
 }
 
 void glShaderWindow::transparentClicked()
 {
     transparent = true;
+    time=0;
     renderNow();
 }
 
 void glShaderWindow::opaqueClicked()
 {
     transparent = false;
+    time=0;
     renderNow();
 }
 
 void glShaderWindow::updateLightIntensity(int lightSliderValue)
 {
     lightIntensity = lightSliderValue / 100.0;
+    time=0;
     renderNow();
 }
 
 void glShaderWindow::updateShininess(int shininessSliderValue)
 {
     shininess = shininessSliderValue;
+    time=0;
     renderNow();
 }
 
 void glShaderWindow::updateEta(int etaSliderValue)
 {
     eta = etaSliderValue/100.0;
+    time=0;
     renderNow();
 }
 void glShaderWindow::updateRoughness(int roughnessSliderValue)
 {
     roughness = roughnessSliderValue/100.0;
+    time=0;
     renderNow();
 }
 
@@ -324,7 +336,7 @@ QWidget *glShaderWindow::makeAuxWindow()
     hboxRoughness->addWidget(roughnessLabelValue);
     outer->addLayout(hboxRoughness);
     outer->addWidget(roughnessSlider);
-
+    
     auxWidget->setLayout(outer);
     return auxWidget;
 }
@@ -645,6 +657,7 @@ void glShaderWindow::setWindowSize(const QString& size)
     QStringList dims = size.split("x");
     parent()->resize(parent()->width() - width() + dims[0].toInt(), parent()->height() - height() + dims[1].toInt());
     resize(dims[0].toInt(), dims[1].toInt());
+    time=0;
     renderNow();
 }
 
@@ -819,6 +832,11 @@ void glShaderWindow::initialize()
     ground_vao.release();
     openScene();
     createSSBO();
+    QTimer *timer = new QTimer(this);
+    connect(timer, &QTimer::timeout, this, &glShaderWindow::onTimerTimeout);
+    timer->start(100); // 1000 ms = 1 seconde
+
+    
 }
 
 void glShaderWindow::resizeEvent(QResizeEvent* event)
@@ -876,6 +894,7 @@ void glShaderWindow::resize(int x, int y)
         else {
             m_perspective.perspective((240.0/M_PI) * atan((float)y/x), (float)x/y, 0.1 * radius, 20 * radius);
         }
+        time=0;
         renderNow();
     }
 }
@@ -942,6 +961,7 @@ void glShaderWindow::wheelEvent(QWheelEvent * ev)
     } else  if (matrixMoving == 2) {
         groundDistance += 0.1 * numDegrees.y();
     }
+    time=0;
     renderNow();
 }
 
@@ -983,6 +1003,7 @@ void glShaderWindow::mouseMoveEvent(QMouseEvent *e)
 	default: break;
     }
     lastMousePosition = mousePosition;
+    time=0;
     renderNow();
 }
 
@@ -993,12 +1014,21 @@ void glShaderWindow::mouseReleaseEvent(QMouseEvent *e)
 
 void glShaderWindow::timerEvent(QTimerEvent *e)
 {
-
+    time+=1;
+   renderNow();
+    
 }
+void glShaderWindow::onTimerTimeout()
+    {
+        // Créer et envoyer un QTimerEvent
+        QTimerEvent *event = new QTimerEvent(0);
+        timerEvent( event);
+    }
 
 void glShaderWindow::keyPressEvent(QKeyEvent* event) {
     if (event->key() == Qt::Key_R) {
         initializeTransformForScene();
+        time=0;
         renderNow();
     }
 }
@@ -1053,6 +1083,7 @@ void glShaderWindow::render()
         compute_program->setUniformValue("shininess", shininess);
         compute_program->setUniformValue("eta", eta);
         compute_program->setUniformValue("roughness", roughness);
+        compute_program->setUniformValue("time", time);
         compute_program->setUniformValue("framebuffer", 2);
         compute_program->setUniformValue("colorTexture", 0);
 		glBindImageTexture(2, computeResult->textureId(), 0, false, 0, GL_WRITE_ONLY, GL_RGBA32F);
@@ -1118,6 +1149,7 @@ void glShaderWindow::render()
     m_program->setUniformValue("shininess", shininess);
     m_program->setUniformValue("eta", eta);
     m_program->setUniformValue("roughness", roughness);
+    m_program->setUniformValue("time", time);
     m_program->setUniformValue("radius", modelMesh->bsphere.r);
 	if (m_program->uniformLocation("colorTexture") != -1) m_program->setUniformValue("colorTexture", 0);
     if (m_program->uniformLocation("envMap") != -1)  m_program->setUniformValue("envMap", 1);
@@ -1127,7 +1159,7 @@ void glShaderWindow::render()
         m_program->setUniformValue("shadowMap", 2);
         // TODO_shadowMapping: send the right transform here
     }
-
+    
     m_vao.bind();
     glDrawElements(GL_TRIANGLES, 3 * m_numFaces, GL_UNSIGNED_INT, 0);
     m_vao.release();

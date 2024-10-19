@@ -1,6 +1,6 @@
 #version 430 core
 
-layout(binding = 2, rgba32f) uniform writeonly image2D framebuffer;
+layout(binding = 2, rgba32f) uniform image2D framebuffer;
 
 uniform sampler2D colorTexture;
 uniform mat4 mat_inverse;
@@ -13,6 +13,7 @@ uniform float shininess;
 uniform float eta;
 uniform float radius;
 uniform float roughness; // addition for alpha
+uniform float time; //for randomization
 
 uniform float groundDistance;
 uniform vec3 center;
@@ -341,7 +342,10 @@ bool isIntersected(vec4 origin, vec4 dir)
 
 // Local illumination related functions. TODO
 float fresnelVal (float cos_theta)
-{
+{   
+    if((pow(eta,2)-(1-pow(cos_theta,2)))<0){
+        return 1.0;
+    }
     float c_i = sqrt((pow(eta,2)-(1-pow(cos_theta,2))));
     float Fs = pow(abs((cos_theta-c_i)/(cos_theta+c_i)),2);
     float Fp = pow(abs((pow(eta,2)*cos_theta-c_i)/(pow(eta,2)*cos_theta+c_i)),2);
@@ -552,7 +556,7 @@ vec4 trace(vec4 origin, vec4 dir)
                 if (j < MAX_TRACE && fallback[j+1]) {
                     vec3 n_vec=normalize(stack[j+1].N.xyz);
                     vec3 v_vec=normalize(-stack[j+1].dir.xyz);
-                    float cos_theta= max(dot(v_vec,n_vec),0.25);
+                    float cos_theta= dot(v_vec,n_vec);
                     float F = fresnelVal(cos_theta);
                     current.color = current.color+F*(stack[j + 1].color); 
                 } 
@@ -575,9 +579,9 @@ void main(void) {
     ivec2 pix = ivec2(gl_GlobalInvocationID.xy);
     vec2 pix_2 = vec2(pix);
     ivec2 size = imageSize(framebuffer);
-    vec2 rand = vec2(1.0,1.0);
-    pix_2.x+=min(gold_noise(rand,0.25),0.5);
-    pix_2.y+=min(gold_noise(rand,0.5),0.5);
+    vec2 rand = vec2(time*854,time*24);
+    pix_2.x+=min(0.5,max(-0.5,gold_noise(rand,time*56)));
+    pix_2.y+=min(0.5,max(-0.5,gold_noise(rand,time*42)));
     if (pix.x >= size.x || pix.y >= size.y) {
         return;
     }
@@ -595,6 +599,8 @@ void main(void) {
     vec4 dir = normalize((mat_inverse * worldPos));
     vec4 eye = (mat_inverse * vec4(0, 0, 0, 1));
     vec4 color = trace(eye, dir);
+    vec4 prev_col= imageLoad(framebuffer, pix);
+    color = (color/(time+1))+((prev_col*time)/(time+1));
 
     imageStore(framebuffer, pix, color);
 }

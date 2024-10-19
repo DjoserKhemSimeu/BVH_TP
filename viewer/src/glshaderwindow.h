@@ -57,6 +57,8 @@ protected:
     void resizeEvent(QResizeEvent * ev);
     void wheelEvent(QWheelEvent * ev);
     void keyPressEvent(QKeyEvent* event);
+private slots:
+    void onTimerTimeout();
 
 private:
     QOpenGLShaderProgram* prepareShaderProgram(const QString& vertexShaderPath, const QString& fragmentShaderPath);
@@ -65,6 +67,7 @@ private:
     void bindSceneToProgram();
     void initializeTransformForScene();
     void initPermTexture();
+    
     void loadTexturesForShaders();
     void openScene();
 
@@ -104,6 +107,7 @@ private:
     float lightIntensity;
     float shininess;
     float roughness;
+    float time;
     float lightDistance;
     float groundDistance;
 
