@@ -542,7 +542,7 @@ vec4 trace(vec4 origin, vec4 dir)
                 if (j < MAX_TRACE && fallback[j+1]) {
                     vec3 n_vec=normalize(stack[j+1].N.xyz);
                     vec3 v_vec=normalize(-stack[j+1].dir.xyz);
-                    float cos_theta= max(dot(v_vec,n_vec),0.25);
+                    float cos_theta= max(dot(v_vec,n_vec),0.2);
                     float F = fresnelVal(cos_theta);
                     current.color = current.color+F*(stack[j + 1].color); 
                 } 
