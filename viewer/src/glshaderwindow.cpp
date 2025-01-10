@@ -30,7 +30,7 @@ glShaderWindow::glShaderWindow(QWindow *parent)
       g_vertices(0), g_normals(0), g_texcoords(0), g_colors(0), g_indices(0),
       gpgpu_vertices(0), gpgpu_normals(0), gpgpu_texcoords(0), gpgpu_colors(0), gpgpu_indices(0),
       environmentMap(0), texture(0), permTexture(0), pixels(0), mouseButton(Qt::NoButton), auxWidget(0),
-      isGPGPU(true), hasComputeShaders(true), blinnPhong(true), transparent(true),roughness(0.05), eta(1.5), lightIntensity(1.0f), shininess(50.0f),time(0.0f), lightDistance(5.0f), groundDistance(0.78),
+      isGPGPU(true), hasComputeShaders(true), blinnPhong(true), transparent(true),quasiRandom(true),roughness(0.05), eta(1.5), lightIntensity(1.0f), shininess(50.0f),time(0.0f), lightDistance(5.0f), groundDistance(0.78),
       shadowMap_fboId(0), shadowMap_rboId(0), shadowMap_textureId(0), fullScreenSnapshots(false), computeResult(0), 
       m_indexBuffer(QOpenGLBuffer::IndexBuffer), ground_indexBuffer(QOpenGLBuffer::IndexBuffer)
 {
@@ -193,6 +193,19 @@ void glShaderWindow::transparentClicked()
     time=0;
     renderNow();
 }
+void glShaderWindow::quasiRandomClicked()
+{
+    quasiRandom = true;
+    time=0;
+    renderNow();
+}
+void glShaderWindow::pseudoRandomClicked()
+{
+    quasiRandom = false;
+    time=0;
+    renderNow();
+}
+
 
 void glShaderWindow::opaqueClicked()
 {
@@ -263,6 +276,20 @@ QWidget *glShaderWindow::makeAuxWindow()
     vbox2->addWidget(transparent2);
     groupBox2->setLayout(vbox2);
     buttons->addWidget(groupBox2);
+    outer->addLayout(buttons);
+
+    QGroupBox *groupBox3 = new QGroupBox("Ray generator:");
+    QRadioButton *random1 = new QRadioButton("&Quasi-Random");
+    QRadioButton *random2 = new QRadioButton("&Pseudo-Random");
+    if (quasiRandom) random1->setChecked(true);
+    else random2->setChecked(true);
+    connect(random1, SIGNAL(clicked()), this, SLOT(quasiRandomClicked()));
+    connect(random2, SIGNAL(clicked()), this, SLOT(pseudoRandomClicked()));
+    QVBoxLayout *vbox3 = new QVBoxLayout;
+    vbox3->addWidget(random1);
+    vbox3->addWidget(random2);
+    groupBox3->setLayout(vbox3);
+    buttons->addWidget(groupBox3);
     outer->addLayout(buttons);
 
     
@@ -1079,6 +1106,7 @@ void glShaderWindow::render()
         compute_program->setUniformValue("lightIntensity", 1.0f);
         compute_program->setUniformValue("blinnPhong", blinnPhong);
         compute_program->setUniformValue("transparent", transparent);
+        compute_program->setUniformValue("quasiRandom", quasiRandom);
         compute_program->setUniformValue("lightIntensity", lightIntensity);
         compute_program->setUniformValue("shininess", shininess);
         compute_program->setUniformValue("eta", eta);
@@ -1145,6 +1173,7 @@ void glShaderWindow::render()
     m_program->setUniformValue("lightIntensity", 1.0f);
     m_program->setUniformValue("blinnPhong", blinnPhong);
     m_program->setUniformValue("transparent", transparent);
+    m_program->setUniformValue("quasiRandom", quasiRandom);
     m_program->setUniformValue("lightIntensity", lightIntensity);
     m_program->setUniformValue("shininess", shininess);
     m_program->setUniformValue("eta", eta);

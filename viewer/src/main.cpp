@@ -93,7 +93,7 @@ int main( int argc, char* argv[] )
 {
     setlocale(LC_ALL,"C");
     QApplication app(argc, argv);
-    QString sceneName = "dragon.ply";
+    QString sceneName = "teapot_wt.ply";
     QString textureName = "bricks.png";
     QString envMapName = "pisa.png";
 
